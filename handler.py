@@ -19,23 +19,23 @@ def registerCommands():
 
     commands = [
         {
-            "name": "hello",
-            "description": "Hello Discord Slash Commands!",
+            "name": "ynu",
+            "description": "Input what you want to know!",
             "options": [
                 {
                     "type": 6, # ApplicationCommandOptionType.USER
-                    "name": "user",
-                    "description": "Who to say hello?",
-                    "required": False
+                    "name": "message",
+                    "description": "what do you want to know?",
+                    "required": True
                 }
             ]
         }
     ]
 
     headers = {
-        "User-Agent": "discord-slash-commands-helloworld",
+        "User-Agent": "beat_helper",
         "Content-Type": "application/json",
-        "Authorization": DISCORD_TOKEN
+        "Authorization": f"Bot {DISCORD_TOKEN}"
     }
 
     for c in commands:
@@ -79,8 +79,8 @@ def callback(event: dict, context: dict):
         opts = {v['name']: v['value'] for v in req['data']['options']} if 'options' in req['data'] else {}
 
         text = "Hello!"
-        if 'user' in opts:
-            text = f"Hello, <@{opts['user']}>!"
+        if 'message' in opts:
+            text = f"Hello, <@{opts['message']}>!"
 
         return {
             "type": 4, # InteractionResponseType.ChannelMessageWithSource

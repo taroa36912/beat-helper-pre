@@ -1,7 +1,7 @@
 AWSTemplateFormatVersion: '2010-09-09'
 Transform: AWS::Serverless-2016-10-31
 Description: >
-  Discord Slash Commands Example
+  YNU information bot for discord
 
 Globals:
   Function:
@@ -28,7 +28,7 @@ Resources:
     Properties:
       CodeUri: .
       Handler: handler.callback
-      Runtime: python3.8
+      Runtime: python3.12
       Events:
         HelloWorld:
           Type: HttpApi # More info about API Event Source: https://github.com/awslabs/serverless-application-model/blob/master/versions/2016-10-31.md#api
