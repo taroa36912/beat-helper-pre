@@ -78,9 +78,9 @@ def callback(event: dict, context: dict):
         # command options list -> dict
         opts = {v['name']: v['value'] for v in req['data']['options']} if 'options' in req['data'] else {}
 
-        text = "Hello!"
+        text = "message : empty"
         if 'message' in opts:
-            text = f"Hello, <@{opts['message']}>!"
+            text = f"message : {opts['message']}"
 
         return {
             "type": 4, # InteractionResponseType.ChannelMessageWithSource
