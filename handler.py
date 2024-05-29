@@ -1,8 +1,6 @@
-import json
-import os
-
-import requests
+import json, os, requests
 from nacl.signing import VerifyKey
+from concurrent.futures import ThreadPoolExecutor
 
 DISCORD_ENDPOINT = "https://discord.com/api/v8"
 
@@ -12,6 +10,8 @@ APPLICATION_PUBLIC_KEY = os.getenv('APPLICATION_PUBLIC_KEY')
 COMMAND_GUILD_ID = os.getenv('COMMAND_GUILD_ID')
 
 verify_key = VerifyKey(bytes.fromhex(APPLICATION_PUBLIC_KEY))
+
+executor = ThreadPoolExecutor(max_workers=5)
 
 def registerCommands():
     endpoint = f"{DISCORD_ENDPOINT}/applications/{APPLICATION_ID}/guilds/{COMMAND_GUILD_ID}/commands"
@@ -26,14 +26,14 @@ def registerCommands():
                     "type": 3, # ApplicationCommandOptionType.String
                     "name": "message",
                     "description": "what do you want to know?",
-                    "required": True
+                    "required": False
                 }
             ]
         }
     ]
 
     headers = {
-        "User-Agent": "beat_helper",
+        "User-Agent": "beat-helper",
         "Content-Type": "application/json",
         "Authorization": f"Bot {DISCORD_TOKEN}"
     }
@@ -77,14 +77,35 @@ def callback(event: dict, context: dict):
     elif req['type'] == 2: # InteractionType.ApplicationCommand
         # command options list -> dict
         opts = {v['name']: v['value'] for v in req['data']['options']} if 'options' in req['data'] else {}
+        interactionToken = req['token']
 
-        text = "message : empty"
-        if 'message' in opts:
-            text = f"message : {opts['message']}"
-
-        return {
+        if not 'message' in opts:
+            return {
             "type": 4, # InteractionResponseType.ChannelMessageWithSource
             "data": {
-                "content": text
+                "content": "メッセージが入力されていません."
             }
         }
+        else:
+            text = f"{opts['message']}"
+            executor.submit(sendMessage, interactionToken, text)
+            return {
+                "type": 5, # InteractionResponseType.DeferredChannelMessageWithSource
+                "data": {
+                    "content": f"処理中…"
+                }
+            }
+            
+
+def sendMessage(interactionToken: str, text: str):
+    url = f"{DISCORD_ENDPOINT}/webhooks/{APPLICATION_ID}/{interactionToken}"
+    headers = {
+        "Authorization": f"Bot {DISCORD_TOKEN}",
+        "Content-Type": "application/json"
+    }
+    payload = {
+        "content": text
+    }
+    response = requests.post(url, headers=headers, json=payload)
+    response.raise_for_status()  # Raise an exception for HTTP errors
+    return response.json()
