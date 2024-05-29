@@ -23,7 +23,7 @@ def registerCommands():
             "description": "Input what you want to know!",
             "options": [
                 {
-                    "type": 6, # ApplicationCommandOptionType.USER
+                    "type": 3, # ApplicationCommandOptionType.String
                     "name": "message",
                     "description": "what do you want to know?",
                     "required": True
