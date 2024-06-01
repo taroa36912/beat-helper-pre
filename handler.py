@@ -1,13 +1,26 @@
-import json, os, requests
+import json, os, requests, time, logging, re
+from dotenv import load_dotenv
 from nacl.signing import VerifyKey
 from concurrent.futures import ThreadPoolExecutor
+from datetime import timedelta
+from typing import Any
+
+from add_document import initialize_vectorstore
+from langchain.callbacks.base import BaseCallbackHandler
+from langchain.chains import ConversationalRetrievalChain
+from langchain_openai import ChatOpenAI
+from langchain.memory import ConversationBufferMemory, MomentoChatMessageHistory
+from langchain.schema import LLMResult
 
 DISCORD_ENDPOINT = "https://discord.com/api/v8"
+
+load_dotenv()
 
 DISCORD_TOKEN = os.getenv('DISCORD_TOKEN')
 APPLICATION_ID = os.getenv('APPLICATION_ID')
 APPLICATION_PUBLIC_KEY = os.getenv('APPLICATION_PUBLIC_KEY')
 COMMAND_GUILD_ID = os.getenv('COMMAND_GUILD_ID')
+OPENAI_APIKEY = os.getenv('OPENAI_APIKEY')
 
 verify_key = VerifyKey(bytes.fromhex(APPLICATION_PUBLIC_KEY))
 
@@ -77,6 +90,7 @@ def callback(event: dict, context: dict):
     elif req['type'] == 2: # InteractionType.ApplicationCommand
         # command options list -> dict
         opts = {v['name']: v['value'] for v in req['data']['options']} if 'options' in req['data'] else {}
+        interactionId = req['id']
         interactionToken = req['token']
 
         if not 'message' in opts:
@@ -88,24 +102,61 @@ def callback(event: dict, context: dict):
         }
         else:
             text = f"{opts['message']}"
-            executor.submit(sendMessage, interactionToken, text)
-            return {
-                "type": 5, # InteractionResponseType.DeferredChannelMessageWithSource
-                "data": {
-                    "content": f"処理中…"
-                }
-            }
-            
+            sendMessage(interactionId, interactionToken, text)
 
-def sendMessage(interactionToken: str, text: str):
-    url = f"{DISCORD_ENDPOINT}/webhooks/{APPLICATION_ID}/{interactionToken}"
+
+def sendMessage(interactionId, interactionToken, text):
+    url = f"{DISCORD_ENDPOINT}/interactions/{interactionId}/{interactionToken}/callback"
     headers = {
-        "Authorization": f"Bot {DISCORD_TOKEN}",
-        "Content-Type": "application/json"
+        "Content-Type": "application/json",
+        "Authorization": f"Bot {DISCORD_TOKEN}"
     }
-    payload = {
-        "content": text
+    body = {
+        "type" : 5,
+        "data" : {
+            "content" : f"現在回答を考え中"
+        }
     }
-    response = requests.post(url, headers=headers, json=payload)
-    response.raise_for_status()  # Raise an exception for HTTP errors
-    return response.json()
+    requests.post(url, headers=headers, json=body)
+    
+    aiAnswer = getAiAnswer(text)
+    
+    url2 = f"{DISCORD_ENDPOINT}/webhooks/{APPLICATION_ID}/{interactionToken}/messages/@original"
+    body2 = {
+        "content" : f"GPTの回答 : {aiAnswer}"
+    }
+    requests.patch(url2, headers=headers, json=body2)
+
+
+def getAiAnswer(text):
+    url = "https://api.openai.com/v1/chat/completions"
+    if not OPENAI_APIKEY:
+        return f"API KEYが取得できませんでした. 入力 : {text}"
+
+    # POSTデータの作成
+    request_data = {
+        "model": "gpt-4o",
+        "messages": [
+            {"role": "user", "content": text}
+        ]
+    }
+
+    # ヘッダーの設定
+    headers = {
+        "Content-Type": "application/json",
+        "Authorization": f"Bearer {OPENAI_APIKEY}"
+    }
+    
+    response = requests.post(url, headers=headers, data=json.dumps(request_data))
+    response.raise_for_status()  # HTTPエラーチェック
+    
+    response_data = response.json()
+    return parse_response(response_data)
+
+
+
+def parse_response(response_data):
+    if "choices" not in response_data or len(response_data["choices"]) == 0:
+        return "値を正しく取得できませんでした"
+
+    return response_data["choices"][0]["message"]["content"]
