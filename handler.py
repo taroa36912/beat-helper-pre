@@ -12,7 +12,7 @@ DISCORD_TOKEN = os.getenv('DISCORD_TOKEN')
 APPLICATION_ID = os.getenv('APPLICATION_ID')
 APPLICATION_PUBLIC_KEY = os.getenv('APPLICATION_PUBLIC_KEY')
 COMMAND_GUILD_ID = os.getenv('COMMAND_GUILD_ID')
-OPENAI_API_KEY = os.getenv('OPEN_KEY')
+OPENAI_API_KEY = os.getenv('OPENAI_API_KEY')
 
 verify_key = VerifyKey(bytes.fromhex(APPLICATION_PUBLIC_KEY))
 
@@ -94,7 +94,7 @@ def callback(event: dict, context: dict):
         }
         else:
             text = f"{opts['message']}"
-            sendMessage(interactionId, interactionToken, text)
+            executor.submit(sendMessage, interactionId, interactionToken, text)
 
 
 def sendMessage(interactionId, interactionToken, text):
@@ -106,7 +106,7 @@ def sendMessage(interactionId, interactionToken, text):
     body = {
         "type" : 5,
         "data" : {
-            "content" : f"現在回答を考え中"
+            "content" : "現在回答を考え中"
         }
     }
     requests.post(url, headers=headers, json=body)

@@ -21,6 +21,11 @@ Parameters:
   CommandGuildID:
     Description: Discord Guild ID to register commands. Defaults to global commands.
     Type: String
+  OpenAiApiKey:
+    Description: Open Ai Token. Must be prefixed with 'Bot' or 'Bearer'.
+    NoEcho: true
+    Type: String
+
 
 Resources:
   SlashCommandsCallbackFunction:
@@ -41,6 +46,7 @@ Resources:
           APPLICATION_ID: !Ref ApplicationID
           APPLICATION_PUBLIC_KEY: !Ref ApplicationPublicKey
           COMMAND_GUILD_ID: !Ref CommandGuildID
+          OPENAI_API_KEY: !Ref OpenAiApiKey
 
 Outputs:
   CallbackAPIEndpoint:
