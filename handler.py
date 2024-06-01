@@ -1,18 +1,10 @@
-import json, os, requests, time, logging, re
-from dotenv import load_dotenv
+import json, os, requests
 from nacl.signing import VerifyKey
+from dotenv import load_dotenv
 from concurrent.futures import ThreadPoolExecutor
-from datetime import timedelta
-from typing import Any
-
-from add_document import initialize_vectorstore
-from langchain.callbacks.base import BaseCallbackHandler
-from langchain.chains import ConversationalRetrievalChain
-from langchain_openai import ChatOpenAI
-from langchain.memory import ConversationBufferMemory, MomentoChatMessageHistory
-from langchain.schema import LLMResult
 
 DISCORD_ENDPOINT = "https://discord.com/api/v8"
+CHAT_UPDATE_INTERVAL_SEC = 1
 
 load_dotenv()
 
@@ -20,7 +12,7 @@ DISCORD_TOKEN = os.getenv('DISCORD_TOKEN')
 APPLICATION_ID = os.getenv('APPLICATION_ID')
 APPLICATION_PUBLIC_KEY = os.getenv('APPLICATION_PUBLIC_KEY')
 COMMAND_GUILD_ID = os.getenv('COMMAND_GUILD_ID')
-OPENAI_APIKEY = os.getenv('OPENAI_APIKEY')
+OPENAI_API_KEY = os.getenv('OPEN_KEY')
 
 verify_key = VerifyKey(bytes.fromhex(APPLICATION_PUBLIC_KEY))
 
@@ -130,7 +122,7 @@ def sendMessage(interactionId, interactionToken, text):
 
 def getAiAnswer(text):
     url = "https://api.openai.com/v1/chat/completions"
-    if not OPENAI_APIKEY:
+    if not OPENAI_API_KEY:
         return f"API KEYが取得できませんでした. 入力 : {text}"
 
     # POSTデータの作成
@@ -144,7 +136,7 @@ def getAiAnswer(text):
     # ヘッダーの設定
     headers = {
         "Content-Type": "application/json",
-        "Authorization": f"Bearer {OPENAI_APIKEY}"
+        "Authorization": f"Bearer {OPENAI_API_KEY}"
     }
     
     response = requests.post(url, headers=headers, data=json.dumps(request_data))
@@ -152,7 +144,6 @@ def getAiAnswer(text):
     
     response_data = response.json()
     return parse_response(response_data)
-
 
 
 def parse_response(response_data):
