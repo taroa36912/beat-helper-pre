@@ -1,4 +1,4 @@
-import json, os, requests
+import json, os, requests, time
 from nacl.signing import VerifyKey
 from dotenv import load_dotenv
 from concurrent.futures import ThreadPoolExecutor
@@ -94,7 +94,7 @@ def callback(event: dict, context: dict):
         }
         else:
             text = f"{opts['message']}"
-            executor.submit(sendMessage, interactionId, interactionToken, text)
+            sendMessage(interactionId, interactionToken, text)
 
 
 def sendMessage(interactionId, interactionToken, text):
@@ -111,11 +111,11 @@ def sendMessage(interactionId, interactionToken, text):
     }
     requests.post(url, headers=headers, json=body)
     
-    aiAnswer = getAiAnswer(text)
+    aiAnswer = getAiAnswer(text + "\n256トークン以内で返答してください.")
     
     url2 = f"{DISCORD_ENDPOINT}/webhooks/{APPLICATION_ID}/{interactionToken}/messages/@original"
     body2 = {
-        "content" : f"GPTの回答 : {aiAnswer}"
+        "content" : f"あなたの入力 : {text}\nGPTの回答 : {aiAnswer}"
     }
     requests.patch(url2, headers=headers, json=body2)
 
@@ -130,13 +130,14 @@ def getAiAnswer(text):
         "model": "gpt-4o",
         "messages": [
             {"role": "user", "content": text}
-        ]
+        ],
+        "max_tokens": 256
     }
 
     # ヘッダーの設定
     headers = {
         "Content-Type": "application/json",
-        "Authorization": f"Bearer {OPENAI_API_KEY}"
+        "Authorization": f"Bearer {OPENAI_API_KEY}",
     }
     
     response = requests.post(url, headers=headers, data=json.dumps(request_data))
