@@ -18,13 +18,18 @@ Parameters:
   ApplicationPublicKey:
     Description: Discord Application Public Key
     Type: String
-  CommandGuildID:
-    Description: Discord Guild ID to register commands. Defaults to global commands.
-    Type: String
   OpenAiApiKey:
     Description: Open Ai Token. Must be prefixed with 'Bot' or 'Bearer'.
     NoEcho: true
     Type: String
+  PineconeApiKey:
+    Description: Pinecone Api Token. Must be prefixed with 'Bot' or 'Bearer'.
+    NoEcho: true
+    Type: String
+  PineconeEnv:
+    Description: Pinecone env.
+    Type: String
+  
 
 
 Resources:
@@ -45,8 +50,9 @@ Resources:
           DISCORD_TOKEN: !Ref DiscordToken
           APPLICATION_ID: !Ref ApplicationID
           APPLICATION_PUBLIC_KEY: !Ref ApplicationPublicKey
-          COMMAND_GUILD_ID: !Ref CommandGuildID
           OPENAI_API_KEY: !Ref OpenAiApiKey
+          PINECONE_API_KEY: !Ref PineconeApiKey
+          PINECONE_ENV: !Ref PineconeEnv
 
 Outputs:
   CallbackAPIEndpoint:

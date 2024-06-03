@@ -1,22 +1,80 @@
-import json, os, requests, time
+import json, os, requests, logging, logging
 from nacl.signing import VerifyKey
 from dotenv import load_dotenv
 from concurrent.futures import ThreadPoolExecutor
-
-DISCORD_ENDPOINT = "https://discord.com/api/v8"
-CHAT_UPDATE_INTERVAL_SEC = 1
+from datetime import timedelta, datetime
+from typing import Any
+from langchain.chains import ConversationalRetrievalChain
+from langchain_openai import ChatOpenAI
+from langchain.memory import ConversationBufferMemory
+from langchain_community.chat_message_histories import MomentoChatMessageHistory
+from langchain_openai import OpenAIEmbeddings
+from langchain_pinecone import PineconeVectorStore
 
 load_dotenv()
+
+COMMAND_GUILD_ID = '1222864676191473754'
+OPENAI_API_MODEL = 'gpt-4o'
+OPENAI_API_TEMPERATURE = '0.5'
+MOMENTO_CACHE = 'langchain-book'
+MOMENTO_TTL = '1'
+PINECONE_INDEX = 'langchain-book'
+PINECONE_API_KEY = os.getenv("PINECONE_API_KEY")
+PINECONE_ENV = os.getenv("PINECONE_ENV")
+DISCORD_ENDPOINT = "https://discord.com/api/v8"
+CHAT_UPDATE_INTERVAL_SEC = 1
 
 DISCORD_TOKEN = os.getenv('DISCORD_TOKEN')
 APPLICATION_ID = os.getenv('APPLICATION_ID')
 APPLICATION_PUBLIC_KEY = os.getenv('APPLICATION_PUBLIC_KEY')
-COMMAND_GUILD_ID = os.getenv('COMMAND_GUILD_ID')
 OPENAI_API_KEY = os.getenv('OPENAI_API_KEY')
 
 verify_key = VerifyKey(bytes.fromhex(APPLICATION_PUBLIC_KEY))
 
 executor = ThreadPoolExecutor(max_workers=5)
+
+logging.basicConfig(
+    format="%(asctime)s [%(levelname)s] %(message)s", level=logging.INFO
+)
+logger = logging.getLogger(__name__)
+
+def handle_mention(text):
+    history = MomentoChatMessageHistory.from_client_params(
+        str(datetime.now().timestamp()),
+        MOMENTO_CACHE,
+        timedelta(hours=int(MOMENTO_TTL)),
+    )
+    memory = ConversationBufferMemory(
+        chat_memory=history, memory_key="chat_history", return_messages=True
+    )
+
+    vectorstore = PineconeVectorStore(
+        index_name=PINECONE_INDEX,
+        embedding=OpenAIEmbeddings(),
+        pinecone_api_key=PINECONE_API_KEY
+    )
+    
+    llm = ChatOpenAI(
+        model_name=OPENAI_API_MODEL,
+        temperature=OPENAI_API_TEMPERATURE,
+        streaming=True,
+    )
+    condense_question_llm = ChatOpenAI(
+        model_name=OPENAI_API_MODEL,
+        temperature=OPENAI_API_TEMPERATURE,
+    )
+
+    qa_chain = ConversationalRetrievalChain.from_llm(
+        llm=llm,
+        retriever=vectorstore.as_retriever(),
+        memory=memory,
+        condense_question_llm=condense_question_llm,
+    )
+
+    answer = qa_chain.invoke(text)
+    
+    return answer['answer']
+
 
 def registerCommands():
     endpoint = f"{DISCORD_ENDPOINT}/applications/{APPLICATION_ID}/guilds/{COMMAND_GUILD_ID}/commands"
@@ -111,44 +169,10 @@ def sendMessage(interactionId, interactionToken, text):
     }
     requests.post(url, headers=headers, json=body)
     
-    aiAnswer = getAiAnswer(text + "\n256トークン以内で返答してください.")
+    aiAnswer = handle_mention(text)
     
     url2 = f"{DISCORD_ENDPOINT}/webhooks/{APPLICATION_ID}/{interactionToken}/messages/@original"
     body2 = {
         "content" : f"あなたの入力 : {text}\nGPTの回答 : {aiAnswer}"
     }
     requests.patch(url2, headers=headers, json=body2)
-
-
-def getAiAnswer(text):
-    url = "https://api.openai.com/v1/chat/completions"
-    if not OPENAI_API_KEY:
-        return f"API KEYが取得できませんでした. 入力 : {text}"
-
-    # POSTデータの作成
-    request_data = {
-        "model": "gpt-4o",
-        "messages": [
-            {"role": "user", "content": text}
-        ],
-        "max_tokens": 256
-    }
-
-    # ヘッダーの設定
-    headers = {
-        "Content-Type": "application/json",
-        "Authorization": f"Bearer {OPENAI_API_KEY}",
-    }
-    
-    response = requests.post(url, headers=headers, data=json.dumps(request_data))
-    response.raise_for_status()  # HTTPエラーチェック
-    
-    response_data = response.json()
-    return parse_response(response_data)
-
-
-def parse_response(response_data):
-    if "choices" not in response_data or len(response_data["choices"]) == 0:
-        return "値を正しく取得できませんでした"
-
-    return response_data["choices"][0]["message"]["content"]
